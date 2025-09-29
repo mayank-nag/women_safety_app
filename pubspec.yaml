@@ -38,6 +38,10 @@ dependencies:
   firebase_auth: ^4.6.0
   cloud_firestore: ^4.9.0
   geoflutterfire2: ^2.3.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  path_provider: ^2.0.15
+  url_launcher: ^6.3.2
 
 
 
