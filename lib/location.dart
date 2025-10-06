@@ -5,7 +5,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
 // 🔑 Replace with your Google Places API key
-const String GOOGLE_PLACES_API_KEY = 'API_KEY_HERE';
 
 class LocationScreen extends StatefulWidget {
   const LocationScreen({super.key});

@@ -1,11 +1,19 @@
+// main.dart
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'location.dart';
 import 'message.dart';
 import 'emergency.dart';
 import 'sos.dart';
 import 'profile.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Hive.initFlutter();
+  await Hive.openBox('messages');
+  await Hive.openBox('emergency_contacts');
+
   runApp(const MyApp());
 }
 
@@ -39,6 +47,8 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final emergencyBox = Hive.box('emergency_contacts');
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Women's Safety App"),
@@ -46,9 +56,7 @@ class HomeScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () {
-              // navigate to settings screen if you add one
-            },
+            onPressed: () {},
           ),
           IconButton(
             icon: const Icon(Icons.person),
@@ -65,7 +73,6 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 20),
-
             // SOS Button
             Center(
               child: ElevatedButton(
@@ -90,14 +97,12 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
             const Text(
               'Quick Access',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-
             // Quick Access Grid
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -115,7 +120,9 @@ class HomeScreen extends StatelessWidget {
                     () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const EmergencyScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const EmergencyScreen(),
+                        ),
                       );
                     },
                   ),
@@ -126,23 +133,21 @@ class HomeScreen extends StatelessWidget {
                     () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const LocationScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const LocationScreen(),
+                        ),
                       );
                     },
                   ),
                   _buildQuickButton(
                     context,
                     Icons.message,
-                    "Message",
+                    "Messages",
                     () {
-                      // ✅ Fixed: Using placeholder contact
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const MessageScreen(
-                            contactName: "Alice",
-                            phoneNumber: "+911234567890",
-                          ),
+                          builder: (context) => const MessageScreen(),
                         ),
                       );
                     },
@@ -154,7 +159,9 @@ class HomeScreen extends StatelessWidget {
                     () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const EmergencyScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const EmergencyScreen(),
+                        ),
                       );
                     },
                   ),
