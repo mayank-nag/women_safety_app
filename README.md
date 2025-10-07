@@ -1,16 +1,38 @@
-# women_safety_app
+# Women Safety App
 
-A new Flutter project.
+A Flutter-based mobile application designed to enhance personal safety for women. Features include emergency contacts, location tracking, and quick SOS alerts.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## Requirements
+Before running the project, ensure you have:
 
-A few resources to get you started if this is your first Flutter project:
+- [Flutter SDK](https://docs.flutter.dev/get-started/install)
+- [Dart SDK](https://dart.dev/get-dart) (comes with Flutter)
+- IDE: [VS Code](https://code.visualstudio.com/) or [Android Studio](https://developer.android.com/studio)
+- Physical device or Android/iOS emulator
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Check your setup:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter doctor
+
+## Setup & Run
+
+Follow these commands step by step in your terminal:
+
+```bash
+# 1. Clone the repository
+git clone <repository_url>
+
+# 2. Change directory into the project folder
+cd women_safety_app
+
+# 3. Install Flutter dependencies
+flutter pub get
+
+# 4. Run the app on a connected device or emulator
+flutter run
+
+# 5. (Optional) Run with verbose logging for detailed output
+flutter run -v

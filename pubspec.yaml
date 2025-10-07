@@ -1,59 +1,70 @@
-name: women_safety_app
-description: "A new Flutter project."
-publish_to: 'none'
+  name: women_safety_app
+  description: "A new Flutter project."
+  publish_to: 'none'
 
-version: 1.0.0+1
+  version: 1.0.0+1
 
-environment:
-  sdk: ^3.9.2
+  environment:
+    sdk: ^3.9.2
 
-dependencies:
+  dependencies:
+    flutter:
+      sdk: flutter
+
+    # Core Flutter packages
+    cupertino_icons: ^1.0.8
+
+    # Location & Maps
+    google_maps_flutter: ^2.5.0
+    geolocator: ^14.0.2
+    permission_handler: ^11.0.0
+
+    # HTTP
+    http: ^0.13.6
+
+    # Firebase
+    firebase_core: ^2.20.0
+    firebase_auth: ^4.6.0
+    cloud_firestore: ^4.9.0
+    geoflutterfire2: ^2.3.0
+    
+
+    # Storage
+    hive: ^2.2.3
+    hive_flutter: ^1.1.0
+    path_provider: ^2.0.15
+
+    # Utilities
+    url_launcher: ^6.3.2
+    flutter_contacts: ^1.1.9+2
+    another_telephony: ^0.4.1
+    connectivity_plus: ^6.1.0
+    googleapis_auth: ^1.3.0
+    qr_flutter: ^4.0.0
+    mobile_scanner: ^7.1.2
+    
+
+  dev_dependencies:
+    flutter_test:
+      sdk: flutter
+    flutter_lints: ^5.0.0
+    flutter_launcher_icons: ^0.13.1
+    
+  flutter_icons:
+    android: true
+    ios: true
+    image_path: "assets/icon.jpg"  
+
   flutter:
-    sdk: flutter
+    uses-material-design: true
 
-  # Core Flutter packages
-  cupertino_icons: ^1.0.8
 
-  # Location & Maps
-  google_maps_flutter: ^2.5.0
-  geolocator: ^14.0.2
-  permission_handler: ^11.0.0
 
-  # HTTP
-  http: ^0.13.6
 
-  # Firebase
-  firebase_core: ^2.20.0
-  firebase_auth: ^4.6.0
-  cloud_firestore: ^4.9.0
-  geoflutterfire2: ^2.3.0
 
-  # Storage
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
-  path_provider: ^2.0.15
-
-  # Utilities
-  url_launcher: ^6.3.2
-  flutter_contacts: ^1.1.9+2
-  another_telephony: ^0.4.1
-  connectivity_plus: ^6.1.0
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^5.0.0
-
-flutter:
-  uses-material-design: true
-
-  # Add assets here if needed
-  # assets:
-  #   - images/example.png
-
-  # Add custom fonts here if needed
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-# End of pubspec.yaml
+    # Add custom fonts here if needed
+    # fonts:
+    #   - family: Schyler
+    #     fonts:
+    #       - asset: fonts/Schyler-Regular.ttf
+  # End of pubspec.yaml
