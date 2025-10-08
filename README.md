@@ -36,3 +36,5 @@ flutter run
 
 # 5. (Optional) Run with verbose logging for detailed output
 flutter run -v
+
+flutter device
