@@ -1,4 +1,6 @@
+// lib/home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'location.dart';
 import 'message.dart';
 import 'emergency.dart';
@@ -6,15 +8,46 @@ import 'sos.dart';
 import 'profile.dart';
 import 'chatbot/chatbot.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  final String role; // 'user' or 'companion'
+  const HomeScreen({super.key, required this.role});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String name = "";
+  String phone = "";
+  String address = "";
+  String parentName = "";
+  String parentPhone = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      name = prefs.getString('name') ?? "";
+      phone = prefs.getString('phone') ?? "";
+      address = prefs.getString('address') ?? "";
+      parentName = prefs.getString('parentName') ?? "";
+      parentPhone = prefs.getString('parentPhone') ?? "";
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isUser = widget.role == 'user';
     return Scaffold(
       appBar: AppBar(
         title: const Text("Women's Safety App"),
         centerTitle: true,
+        backgroundColor: isUser ? Colors.pinkAccent : Colors.blueGrey,
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -25,7 +58,17 @@ class HomeScreen extends StatelessWidget {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                MaterialPageRoute(
+                  builder: (_) => ProfileScreen(
+                    role: widget.role,
+                    name: name,
+                    phone: phone,
+                    address: address,
+                    parentName: parentName,
+                    parentPhone: parentPhone,
+                    profilePicUrl: null,
+                  ),
+                ),
               );
             },
           ),
@@ -35,6 +78,7 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 20),
+
             // SOS Button
             Center(
               child: ElevatedButton(
@@ -42,11 +86,13 @@ class HomeScreen extends StatelessWidget {
                   backgroundColor: Colors.red,
                   shape: const CircleBorder(),
                   padding: const EdgeInsets.all(60),
+                  shadowColor: Colors.redAccent,
+                  elevation: 8,
                 ),
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const SosScreen()),
+                    MaterialPageRoute(builder: (_) => const SosScreen()),
                   );
                 },
                 child: const Text(
@@ -59,14 +105,20 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 30),
+
             const Text(
               'Quick Access',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.pinkAccent,
+              ),
             ),
             const SizedBox(height: 20),
+
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -78,53 +130,37 @@ class HomeScreen extends StatelessWidget {
                     context,
                     Icons.phone,
                     "Call 112",
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const EmergencyScreen(),
-                        ),
-                      );
-                    },
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const EmergencyScreen()),
+                    ),
                   ),
                   _buildQuickButton(
                     context,
                     Icons.location_on,
                     "Share Location",
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LocationScreen(),
-                        ),
-                      );
-                    },
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LocationScreen()),
+                    ),
                   ),
                   _buildQuickButton(
                     context,
                     Icons.message,
                     "Messages",
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const MessageScreen(),
-                        ),
-                      );
-                    },
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MessageScreen()),
+                    ),
                   ),
                   _buildQuickButton(
                     context,
-                    Icons.contacts,
-                    "Emergency Contacts",
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const EmergencyScreen(),
-                        ),
-                      );
-                    },
+                    Icons.chat_bubble_outline,
+                    "Chatbot",
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ChatbotScreen()),
+                    ),
                   ),
                 ],
               ),
@@ -133,77 +169,40 @@ class HomeScreen extends StatelessWidget {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              "Chat",
-              style: TextStyle(
-                color: Colors.pink,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ChatbotScreen()),
-                );
-              },
-              borderRadius: BorderRadius.circular(60),
-              child: Container(
-                height: 70,
-                width: 70,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFE91E63), Color(0xFFD81B60)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.pink.withOpacity(0.4),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.chat_bubble_outline,
-                    color: Colors.white, size: 32),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
   Widget _buildQuickButton(
-      BuildContext context, IconData icon, String title, VoidCallback onTap) {
+      BuildContext context, IconData icon, String label, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.pink[50],
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.pink, width: 2),
+          border: Border.all(color: Colors.pinkAccent, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.pinkAccent.withOpacity(0.2),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 40, color: Colors.pink),
+            Icon(icon, size: 40, color: Colors.pinkAccent),
             const SizedBox(height: 10),
             Text(
-              title,
+              label,
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Colors.pink,
+                color: Colors.pinkAccent,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),

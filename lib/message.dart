@@ -1,9 +1,10 @@
+// lib/message.dart
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:another_telephony/telephony.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 
 final Telephony telephony = Telephony.instance;
 
@@ -21,9 +22,14 @@ class _MessageScreenState extends State<MessageScreen> {
   @override
   void initState() {
     super.initState();
-    _messageBox = Hive.box('messages');
-    _emergencyBox = Hive.box('emergency_contacts');
+    _initHive();
     _askSmsPermission();
+  }
+
+  Future<void> _initHive() async {
+    _messageBox = await Hive.openBox('messages');
+    _emergencyBox = await Hive.openBox('emergency_contacts');
+    setState(() {});
   }
 
   Future<void> _askSmsPermission() async {
@@ -41,19 +47,12 @@ class _MessageScreenState extends State<MessageScreen> {
       if (contact != null && contact.phones.isNotEmpty) {
         final name = contact.displayName;
         final phone = contact.phones.first.number;
-
         _emergencyBox.add({'name': name, 'phone': phone});
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("$name added successfully!")),
           );
         }
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Permission denied to access contacts")),
-        );
       }
     }
   }
@@ -69,6 +68,12 @@ class _MessageScreenState extends State<MessageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!Hive.isBoxOpen('emergency_contacts')) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Messages"),
@@ -109,7 +114,8 @@ class _MessageScreenState extends State<MessageScreen> {
                 leading: const CircleAvatar(child: Icon(Icons.person)),
                 title: Text(contact['name'] ?? 'Unknown'),
                 subtitle: Text(contact['phone'] ?? ''),
-                onTap: () => _openChat(contact['name'] ?? '', contact['phone'] ?? ''),
+                onTap: () =>
+                    _openChat(contact['name'] ?? '', contact['phone'] ?? ''),
               );
             },
           );
@@ -133,7 +139,7 @@ class ContactSearchDelegate extends SearchDelegate {
   @override
   List<Widget>? buildActions(BuildContext context) => [
         if (query.isNotEmpty)
-          IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
+          IconButton(icon: const Icon(Icons.clear), onPressed: () => query = '')
       ];
 
   @override
@@ -195,59 +201,57 @@ class _ChatPageState extends State<ChatPage> {
     if (text.isEmpty) return;
 
     final cleanedNumber = widget.phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
-    final waUri = Uri.parse("https://wa.me/$cleanedNumber?text=${Uri.encodeComponent(text)}");
 
-    try {
-      // ✅ Always try WhatsApp first
-      final canOpen = await canLaunchUrl(waUri);
+    // Save locally
+    await _messageBox.add({
+      'contact': widget.contactName,
+      'phone': widget.phoneNumber,
+      'text': text,
+      'time': DateTime.now().toString().substring(0, 16),
+    });
 
-      if (canOpen) {
-        await launchUrl(waUri, mode: LaunchMode.externalApplication);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Opening WhatsApp...")),
-        );
-      } else {
-        // WhatsApp cannot open
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("WhatsApp not available, sending SMS instead...")),
-        );
+    // Send to Firebase (app-to-app chat)
+    final conversationId = _getConversationId(cleanedNumber);
+    final hasInternet = await _checkInternet();
 
-        final connectivity = await Connectivity().checkConnectivity();
-        final hasInternet = connectivity == ConnectivityResult.mobile || connectivity == ConnectivityResult.wifi;
-
-        if (!hasInternet) {
-          await telephony.sendSms(to: cleanedNumber, message: text, isMultipart: true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("No internet — sent via SMS")),
-          );
-        } else {
-          await telephony.sendSms(to: cleanedNumber, message: text, isMultipart: true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Fallback to SMS complete")),
-          );
-        }
-      }
-
-      // 💾 Save the message locally
-      await _messageBox.add({
-        'contact': widget.contactName,
-        'phone': widget.phoneNumber,
+    if (hasInternet) {
+      FirebaseFirestore.instance
+          .collection('chats')
+          .doc(conversationId)
+          .collection('messages')
+          .add({
+        'sender': 'me',
         'text': text,
-        'time': DateTime.now().toString().substring(0, 16),
+        'timestamp': FieldValue.serverTimestamp(),
       });
-
-      _controller.clear();
-      setState(() {});
-    } catch (e) {
+    } else {
+      // fallback to SMS
+      await telephony.sendSms(to: cleanedNumber, message: text, isMultipart: true);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error sending message: $e")),
+        const SnackBar(content: Text("No internet — sent via SMS")),
       );
     }
+
+    _controller.clear();
+    setState(() {});
+  }
+
+  String _getConversationId(String number) {
+    // simple sorted ID to make it unique between two users
+    final ids = ['me', number]..sort();
+    return ids.join('-');
+  }
+
+  Future<bool> _checkInternet() async {
+    final connectivity = await Connectivity().checkConnectivity();
+    return connectivity == ConnectivityResult.mobile || connectivity == ConnectivityResult.wifi;
   }
 
   @override
   Widget build(BuildContext context) {
-    final messages = _messageBox.values.where((msg) => msg['phone'] == widget.phoneNumber).toList();
+    final messages = _messageBox.values
+        .where((msg) => msg['phone'] == widget.phoneNumber)
+        .toList();
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.contactName)),

@@ -38,3 +38,6 @@ flutter run
 flutter run -v
 
 flutter device
+flutterfire configure
+flutterfire configure
+C:\Users\<YourUser>\AppData\Local\Pub\Cache\bin

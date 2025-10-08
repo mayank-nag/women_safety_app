@@ -1,83 +1,102 @@
+// lib/user_selection_screen.dart
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'home_screen.dart';
-import 'companion.dart';
+import 'profile_form_screen.dart';
 
-class UserSelectionScreen extends StatefulWidget {
+class UserSelectionScreen extends StatelessWidget {
   const UserSelectionScreen({super.key});
-
-  @override
-  State<UserSelectionScreen> createState() => _UserSelectionScreenState();
-}
-
-class _UserSelectionScreenState extends State<UserSelectionScreen> {
-  late Box messagesBox;
-  late Box contactsBox;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Safe Hive access after boxes are open
-    messagesBox = Hive.box('messages');
-    contactsBox = Hive.box('emergency_contacts');
-
-    // Example: check if first-time user
-    if (!contactsBox.containsKey('first_launch')) {
-      contactsBox.put('first_launch', true);
-      print("First-time launch");
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Select Your Role'),
-        centerTitle: true,
+      backgroundColor: Colors.pink[50],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                "Welcome to Women Safety App",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFD81B60),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                "Choose your role to continue",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.pinkAccent,
+                ),
+              ),
+              const SizedBox(height: 50),
+
+              _buildRoleButton(
+                context,
+                icon: Icons.female,
+                label: "I am a Woman",
+                colors: [Color(0xFFF48FB1), Color(0xFFE91E63)],
+                role: 'user',
+              ),
+              const SizedBox(height: 30),
+              _buildRoleButton(
+                context,
+                icon: Icons.people_alt,
+                label: "I am a Companion",
+                colors: [Color(0xFFF8BBD0), Color(0xFFD81B60)],
+                role: 'companion',
+              ),
+            ],
+          ),
+        ),
       ),
-      body: Center(
-        child: Column(
+    );
+  }
+
+  Widget _buildRoleButton(BuildContext context,
+      {required IconData icon,
+      required String label,
+      required List<Color> colors,
+      required String role}) {
+    return InkWell(
+      onTap: () {
+        // Navigate to Profile Form to enter real details
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProfileFormScreen(role: role),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 80,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: colors),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: colors.last.withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'How will you be using this app?',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 40),
-
-            ElevatedButton.icon(
-              icon: const Icon(Icons.person, size: 30),
-              label: const Text('Primary User (Woman)',
-                  style: TextStyle(fontSize: 16)),
-              onPressed: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => const HomeScreen()),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            ElevatedButton.icon(
-              icon: const Icon(Icons.security, size: 30),
-              label: const Text('Emergency Contact',
-                  style: TextStyle(fontSize: 16)),
-              onPressed: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                      builder: (context) => const CompanionScreen()),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                backgroundColor: Colors.blueGrey,
-              ),
+          children: [
+            Icon(icon, color: Colors.white, size: 36),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold),
             ),
           ],
         ),

@@ -44,6 +44,8 @@ dependencies:
   flutter_linkify: ^6.0.0
   ffi: ^2.1.0
   dio: ^5.9.0
+  uuid: ^4.4.0
+  shared_preferences: ^2.2.2
   
 
   
