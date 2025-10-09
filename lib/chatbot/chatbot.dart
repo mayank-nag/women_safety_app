@@ -55,7 +55,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   }
 
   Future<void> _initGemini() async {
-    const apiKey = "AIzaSyBqyVHPxt08HnP8NB6MQpeoqqC_fdWOnx0"; // 🔑 Replace with your Gemini API key
+    const apiKey = "YOUR_GEMINI_API_KEY_HERE"; // 🔑 Replace with your Gemini API key
     _model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: apiKey);
     _chat = _model.startChat();
   }

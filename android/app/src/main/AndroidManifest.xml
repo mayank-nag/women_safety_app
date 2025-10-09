@@ -14,7 +14,7 @@
     <uses-permission android:name="android.permission.READ_SMS"/>
 
     <application
-        android:label="women_safety_app"
+        android:label="Abhaya"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
