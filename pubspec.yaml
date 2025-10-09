@@ -27,6 +27,7 @@ dependencies:
   firebase_auth: ^4.6.0
   cloud_firestore: ^4.9.0
   geoflutterfire2: ^2.3.0
+  firebase_database: ^10.1.0
 
   # Storage
   hive: ^2.2.3
@@ -47,6 +48,8 @@ dependencies:
   uuid: ^4.4.0
   shared_preferences: ^2.2.2
   google_generative_ai: ^0.4.3
+  #clearworkmanager: 0.4.1
+  #background_locator_2: ^2.0.6
   
 
   

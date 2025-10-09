@@ -1,0 +1,31 @@
+{
+  "users": {
+    "user_917783039938": {
+      "role": "user",
+      "name": "Riya Variyani",
+      "phone": "+91 77830 39938",
+      "linkedCompanion": "companion_7297017927",
+      "location": {
+        "latitude": 26.9124,
+        "longitude": 75.7873,
+        "timestamp": "2025-10-09T18:45:00.000000"
+      },
+      "chats": {
+        "companion_7297017927": {
+          "messages": {
+            "msg1": {
+              "from": "user_917783039938",
+              "text": "Hey, I am here",
+              "timestamp": "2025-10-09T18:50:00.000000"
+            },
+            "msg2": {
+              "from": "companion_7297017927",
+              "text": "On my way!",
+              "timestamp": "2025-10-09T18:51:00.000000"
+            }
+          }
+        }
+      }
+    }
+  }
+}

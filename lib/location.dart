@@ -1,14 +1,61 @@
-import 'dart:convert';
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
+import 'package:firebase_database/firebase_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-// 🔑 Replace with your Google Places API key
-const String GOOGLE_PLACES_API_KEY = "YOUR_API_KEY_HERE";
+// Hardcoded Police Stations (Red)
+final List<Map<String, dynamic>> policeStations = [
+  {
+    'name': 'Police Station Mahatma Gandhi Nagar',
+    'lat': 26.8903,
+    'lng': 75.8107,
+    'address': 'Mahatma Gandhi Nagar, Sitapura, Jaipur'
+  },
+  {
+    'name': 'Pratap Nagar Police Station',
+    'lat': 26.8025,
+    'lng': 75.8440,
+    'address': 'Sector 11, Pratap Nagar, Jaipur'
+  },
+  {
+    'name': 'Sanganer Police Station',
+    'lat': 26.8195,
+    'lng': 75.7970,
+    'address': 'Dada Gurudev Nagar, Sanganer, Jaipur'
+  },
+];
+
+// Hardcoded Hospitals (Blue)
+final List<Map<String, dynamic>> hospitals = [
+  {
+    'name': 'Sanganer Sadar Hospital',
+    'lat': 26.8578,
+    'lng': 75.7985,
+    'address': 'Sanganer, Jaipur'
+  },
+  {
+    'name': 'CS Hospital',
+    'lat': 26.8904,
+    'lng': 75.7287,
+    'address': 'Heerapura, Jaipur'
+  },
+  {
+    'name': 'Narayana Hospital',
+    'lat': 26.7949,
+    'lng': 75.8254,
+    'address': 'Sector 28, Pratap Nagar, Jaipur'
+  },
+];
+
+// Hardcoded companion location
+final LatLng hardcodedCompanionLocation = LatLng(27.7885479, 75.8343913);
 
 class LocationScreen extends StatefulWidget {
-  const LocationScreen({super.key});
+  final String userId; // Main user ID
+  const LocationScreen({super.key, required this.userId});
 
   @override
   State<LocationScreen> createState() => _LocationScreenState();
@@ -16,26 +63,26 @@ class LocationScreen extends StatefulWidget {
 
 class _LocationScreenState extends State<LocationScreen> {
   GoogleMapController? _mapController;
-  LatLng? _currentPosition;
+  LatLng? currentUserLocation;
+
+  late DatabaseReference _userRef;
   final Set<Marker> _markers = {};
-  Circle? _radiusCircle;
-
-  static const double radiusMeters = 100.0;
-
-  // Nearby device counts
-  int totalDevices = 0;
-  int unknownDevices = 0;
-  int contactDevices = 0;
+  Timer? _locationTimer;
 
   @override
   void initState() {
     super.initState();
+    _initReferences();
+  }
+
+  Future<void> _initReferences() async {
+    _userRef = FirebaseDatabase.instance.ref('users/${widget.userId}/location');
     _checkLocationPermission();
   }
 
   Future<void> _checkLocationPermission() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
-      _showSnack("Location services are disabled.");
+      _showSnack("Enable location services.");
       return;
     }
 
@@ -46,177 +93,106 @@ class _LocationScreenState extends State<LocationScreen> {
     }
     if (permission == LocationPermission.deniedForever) return;
 
-    Position pos = await Geolocator.getCurrentPosition();
-    _updateUserPosition(pos);
+    Position pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
+    _updateUserLocation(pos);
+
+    _locationTimer?.cancel();
+    _locationTimer =
+        Timer.periodic(const Duration(minutes: 2), (_) async {
+      Position pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+      _updateUserLocation(pos);
+    });
   }
 
-  void _updateUserPosition(Position pos) {
-    _currentPosition = LatLng(pos.latitude, pos.longitude);
+  void _updateUserLocation(Position pos) {
+    currentUserLocation = LatLng(pos.latitude, pos.longitude);
 
-    _addUserMarker();
-    _drawRadiusCircle();
+    // Update Firebase
+    _userRef.set({
+      'latitude': pos.latitude,
+      'longitude': pos.longitude,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
 
+    _updateMarkers();
     _mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(_currentPosition!, 16),
-    );
-
-    _fetchNearbyPlaces('hospital');
-    _fetchNearbyPlaces('police');
-
-    _simulateNearbyPeople();
+        CameraUpdate.newLatLngZoom(currentUserLocation!, 16));
   }
 
-  void _addUserMarker() {
-    _markers.removeWhere((m) => m.markerId.value == 'me');
-    _markers.add(
-      Marker(
-        markerId: const MarkerId('me'),
-        position: _currentPosition!,
-        infoWindow: const InfoWindow(title: "You are here"),
+  void _updateMarkers() {
+    final Set<Marker> markers = {};
+
+    // User (pink)
+    if (currentUserLocation != null) {
+      markers.add(Marker(
+        markerId: const MarkerId('user'),
+        position: currentUserLocation!,
+        infoWindow: const InfoWindow(title: 'You'),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueMagenta),
+      ));
+    }
+
+    // Companion (green) - hardcoded
+    markers.add(Marker(
+      markerId: const MarkerId('companion'),
+      position: hardcodedCompanionLocation,
+      infoWindow: const InfoWindow(title: 'Companion'),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+    ));
+
+    // Police (red)
+    for (var ps in policeStations) {
+      markers.add(Marker(
+        markerId: MarkerId(ps['name']),
+        position: LatLng(ps['lat'], ps['lng']),
+        infoWindow: InfoWindow(title: ps['name']),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+      ));
+    }
+
+    // Hospitals (blue)
+    for (var h in hospitals) {
+      markers.add(Marker(
+        markerId: MarkerId(h['name']),
+        position: LatLng(h['lat'], h['lng']),
+        infoWindow: InfoWindow(title: h['name']),
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-      ),
-    );
-    setState(() {});
-  }
-
-  void _drawRadiusCircle() {
-    _radiusCircle = Circle(
-      circleId: const CircleId('radius'),
-      center: _currentPosition!,
-      radius: radiusMeters,
-      strokeColor: Colors.blue.withOpacity(0.5),
-      fillColor: Colors.blue.withOpacity(0.1),
-      strokeWidth: 2,
-    );
-    setState(() {});
-  }
-
-  void _simulateNearbyPeople() {
-    if (_currentPosition == null) return;
-
-    _markers.removeWhere((m) => m.markerId.value.startsWith('user_'));
-
-    final fakeUsers = [
-      LatLng(_currentPosition!.latitude + 0.0005, _currentPosition!.longitude + 0.0005),
-      LatLng(_currentPosition!.latitude - 0.0004, _currentPosition!.longitude + 0.0003),
-      LatLng(_currentPosition!.latitude + 0.0002, _currentPosition!.longitude - 0.0006),
-    ];
-
-    for (int i = 0; i < fakeUsers.length; i++) {
-      _markers.add(
-        Marker(
-          markerId: MarkerId('user_$i'),
-          position: fakeUsers[i],
-          infoWindow: InfoWindow(title: 'User ${i + 1}'),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-        ),
-      );
+      ));
     }
 
-    // Update counts
-    totalDevices = fakeUsers.length;
-    contactDevices = 1; // Example: one contact nearby
-    unknownDevices = totalDevices - contactDevices;
-
-    setState(() {});
+    setState(() {
+      _markers.clear();
+      _markers.addAll(markers);
+    });
   }
 
-  Future<void> _fetchNearbyPlaces(String type) async {
-    if (_currentPosition == null) return;
-
-    final url =
-        'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
-        '?location=${_currentPosition!.latitude},${_currentPosition!.longitude}'
-        '&radius=1000&type=$type&key=$GOOGLE_PLACES_API_KEY';
-
-    try {
-      final response = await http.get(Uri.parse(url));
-      print("Places API response: ${response.body}");
-
-      if (response.statusCode != 200) {
-        _showSnack("Places API error: ${response.statusCode}");
-        return;
-      }
-
-      final data = json.decode(response.body);
-      if (data['status'] != 'OK') {
-        _showSnack("Places API status: ${data['status']}");
-        return;
-      }
-
-      final results = data['results'] as List<dynamic>;
-      for (var place in results.take(8)) {
-        final loc = place['geometry']['location'];
-        final LatLng pos = LatLng(loc['lat'], loc['lng']);
-        final String placeId = place['place_id'];
-
-        _markers.add(
-          Marker(
-            markerId: MarkerId('place_$placeId'),
-            position: pos,
-            infoWindow: InfoWindow(title: place['name'], snippet: place['vicinity']),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              type == 'hospital' ? BitmapDescriptor.hueRed : BitmapDescriptor.hueGreen,
-            ),
-          ),
-        );
-      }
-      setState(() {});
-    } catch (e) {
-      _showSnack("Error fetching $type: $e");
-    }
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  @override
+  void dispose() {
+    _locationTimer?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Location")),
-      body: _currentPosition == null
+      body: currentUserLocation == null
           ? const Center(child: CircularProgressIndicator())
-          : Stack(
-              children: [
-                GoogleMap(
-                  initialCameraPosition: CameraPosition(target: _currentPosition!, zoom: 16),
-                  markers: _markers,
-                  circles: _radiusCircle != null ? {_radiusCircle!} : {},
-                  onMapCreated: (controller) => _mapController = controller,
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                ),
-                _buildBottomPanel(),
-              ],
+          : GoogleMap(
+              initialCameraPosition:
+                  CameraPosition(target: currentUserLocation!, zoom: 16),
+              markers: _markers,
+              onMapCreated: (controller) => _mapController = controller,
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
             ),
-    );
-  }
-
-  Widget _buildBottomPanel() {
-    return Positioned(
-      bottom: 20,
-      left: 20,
-      right: 20,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: const [
-            BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Total devices nearby: $totalDevices", style: const TextStyle(fontSize: 16)),
-            Text("Unknown: $unknownDevices", style: const TextStyle(fontSize: 16, color: Colors.red)),
-            Text("Contacts: $contactDevices", style: const TextStyle(fontSize: 16, color: Colors.green)),
-          ],
-        ),
-      ),
     );
   }
 }

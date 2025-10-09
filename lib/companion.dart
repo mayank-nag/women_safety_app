@@ -1,179 +1,151 @@
-// companion.dart
+// lib/companion.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
-class CompanionScreen extends StatelessWidget {
-  const CompanionScreen({super.key});
+import 'companion_location.dart';
+import 'companion_chat.dart';
+import 'profile.dart';
+
+class CompanionRoot extends StatefulWidget {
+  final String companionId; // This companion's unique ID (usually phone)
+  final String mainUserId;  // Linked main user ID
+
+  const CompanionRoot({
+    super.key,
+    required this.companionId,
+    required this.mainUserId,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
+  State<CompanionRoot> createState() => _CompanionRootState();
+}
 
-    return Scaffold(
-      backgroundColor: Colors.blue[50],
-      appBar: AppBar(
-        backgroundColor: Colors.blue[700],
-        elevation: 0,
-        title: const Text('Companion'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code),
-            onPressed: () {
-              // TODO: QR generator logic
-            },
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: GestureDetector(
-              onTap: () {
-                // TODO: open profile
-              },
-              child: const CircleAvatar(
-                backgroundColor: Colors.yellow,
-                child: Icon(Icons.person, color: Colors.white),
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // User info
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: Colors.brown[400],
-                  child: const Icon(Icons.person, color: Colors.white, size: 30),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Main User Name',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blue[900],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+class _CompanionRootState extends State<CompanionRoot> {
+  int _selectedIndex = 0;
 
-            // Location / Map section (40-50% of screen)
-            Container(
-              height: screenHeight * 0.45,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Text(
-                  'Main User Location / Map',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
+  // Profile data
+  String role = 'companion';
+  String name = '';
+  String phone = '';
+  String address = '';
+  String parentName = '';
+  String parentPhone = '';
 
-            // Chat section (remaining space)
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue[100],
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Chat',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.blue[900],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      child: ListView(
-                        children: [
-                          chatBubble('Hello! How are you?', false),
-                          chatBubble('I am fine, thank you!', true),
-                          chatBubble('Ready for our trip?', false),
-                        ],
-                      ),
-                    ),
-                    // Message input
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            decoration: InputDecoration(
-                              hintText: 'Type a message...',
-                              fillColor: Colors.white,
-                              filled: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(24),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: Colors.blue[700],
-                          child: const Icon(Icons.send, color: Colors.white),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      role = prefs.getString('role') ?? 'companion';
+      name = prefs.getString('name') ?? 'Companion';
+      phone = prefs.getString('phone') ?? '0000000000';
+      address = prefs.getString('address') ?? '';
+      parentName = prefs.getString('parentName') ?? '';
+      parentPhone = prefs.getString('parentPhone') ?? '';
+    });
+  }
+
+  void _showQrCode() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SimpleQrScreen(name: name, phone: phone),
       ),
     );
   }
 
-  Widget chatBubble(String message, bool isSentByUser) {
-    return Align(
-      alignment: isSentByUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSentByUser ? Colors.blue[700] : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Text(
-          message,
-          style: TextStyle(
-            color: isSentByUser ? Colors.white : Colors.blue[900],
+  @override
+  Widget build(BuildContext context) {
+    final List<Widget> _screens = [
+      // Correct: use userId for CompanionLocationScreen
+      CompanionLocationScreen(
+        companionId: widget.companionId,
+        userId: widget.mainUserId,
+      ),
+      // Correct: pass mainUserId as required for CompanionChatScreen
+      CompanionChatScreen(
+        companionId: widget.companionId,
+        mainUserId: widget.mainUserId,
+      ),
+      // Profile page
+      ProfileScreen(
+        role: role,
+        name: name,
+        phone: phone,
+        address: address,
+        parentName: parentName,
+        parentPhone: parentPhone,
+      ),
+    ];
+
+    return Scaffold(
+      body: _screens[_selectedIndex],
+      appBar: AppBar(
+        title: const Text('Companion Mode'),
+        backgroundColor: Colors.blue[700],
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code),
+            onPressed: _showQrCode,
           ),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) => setState(() => _selectedIndex = index),
+        selectedItemColor: Colors.blue[700],
+        unselectedItemColor: Colors.blueGrey,
+        showUnselectedLabels: true,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.location_on_outlined),
+            activeIcon: Icon(Icons.location_on),
+            label: 'Location',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble_outline),
+            activeIcon: Icon(Icons.chat_bubble),
+            label: 'Chat',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// QR Code screen
+class SimpleQrScreen extends StatelessWidget {
+  final String name;
+  final String phone;
+
+  const SimpleQrScreen({super.key, required this.name, required this.phone});
+
+  @override
+  Widget build(BuildContext context) {
+    final qrString = 'Name: $name\nPhone: $phone';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('QR Code'),
+        backgroundColor: Colors.blue[700],
+      ),
+      body: Center(
+        child: QrImageView(
+          data: qrString,
+          size: 200.0,
+          version: QrVersions.auto,
+          gapless: false,
         ),
       ),
     );

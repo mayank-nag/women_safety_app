@@ -4,17 +4,16 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'user_selection_screen.dart';
+import 'profile_form_screen.dart';
 import 'home_screen.dart';
 import 'companion.dart';
-import 'profile_form_screen.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  await Firebase.initializeApp();
-
-  // Initialize Hive and open boxes
+  // Initialize Firebase & Hive
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await Hive.initFlutter();
   await Hive.openBox('messages');
   await Hive.openBox('emergency_contacts');
@@ -30,10 +29,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: "Women's Safety App",
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.pink,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
+      theme: ThemeData(primarySwatch: Colors.pink),
       home: const RootScreen(),
       routes: {
         '/user-selection': (context) => const UserSelectionScreen(),
@@ -42,7 +38,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// 🔹 RootScreen handles first-time role selection + profile + dashboard navigation
 class RootScreen extends StatefulWidget {
   const RootScreen({super.key});
 
@@ -52,24 +47,28 @@ class RootScreen extends StatefulWidget {
 
 class _RootScreenState extends State<RootScreen> {
   String? role;
+  String? name;
+  String? phone;
   bool profileComplete = false;
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadPrefs();
+    _initializeApp();
   }
 
-  Future<void> _loadPrefs() async {
+  Future<void> _initializeApp() async {
     final prefs = await SharedPreferences.getInstance();
     final savedRole = prefs.getString('role');
-    final name = prefs.getString('name');
-    final phone = prefs.getString('phone');
+    final savedName = prefs.getString('name');
+    final savedPhone = prefs.getString('phone');
 
     setState(() {
       role = savedRole;
-      profileComplete = (name != null && phone != null);
+      name = savedName;
+      phone = savedPhone;
+      profileComplete = savedName != null && savedPhone != null;
       isLoading = false;
     });
   }
@@ -77,26 +76,21 @@ class _RootScreenState extends State<RootScreen> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // Case 1: No role selected yet
-    if (role == null) {
-      return const UserSelectionScreen();
-    }
+    if (role == null) return const UserSelectionScreen();
+    if (!profileComplete) return ProfileFormScreen(role: role!);
 
-    // Case 2: Role selected but no profile yet
-    if (!profileComplete) {
-      return ProfileFormScreen(role: role!);
-    }
-
-    // Case 3: Everything set up → go to role-based screen
     if (role == 'user') {
       return HomeScreen(role: 'user');
     } else {
-      return const CompanionScreen();
+      // Companion: pass companionId and linked main user ID
+      final mainUserId = 'user_917783039938'; // Replace dynamically if QR scan is used
+      return CompanionRoot(
+        companionId: phone!,
+        mainUserId: mainUserId,
+      );
     }
   }
 }

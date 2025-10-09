@@ -7,6 +7,7 @@ import 'emergency.dart';
 import 'sos.dart';
 import 'profile.dart';
 import 'chatbot/chatbot.dart';
+import 'qr_scanner.dart'; // MobileScanner QR scanner
 
 class HomeScreen extends StatefulWidget {
   final String role; // 'user' or 'companion'
@@ -43,16 +44,31 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final isUser = widget.role == 'user';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Women's Safety App"),
         centerTitle: true,
         backgroundColor: isUser ? Colors.pinkAccent : Colors.blueGrey,
         actions: [
+          // QR Scanner Icon
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+              );
+            },
+          ),
+
+          // Settings Icon
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {},
           ),
+
+          // Profile Icon
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {
@@ -74,6 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -105,6 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
+
             const SizedBox(height: 30),
 
             const Text(
@@ -115,6 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.pinkAccent,
               ),
             ),
+
             const SizedBox(height: 20),
 
             Padding(
@@ -139,10 +158,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     context,
                     Icons.location_on,
                     "Share Location",
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const LocationScreen()),
-                    ),
+                    () {
+                      // 👇 Build proper Firebase ID from stored phone number
+                      final cleanedPhone =
+                          phone.replaceAll('+', '').replaceAll(' ', '');
+                      final userId = 'user_$cleanedPhone';
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => LocationScreen(userId: userId),
+                        ),
+                      );
+                    },
                   ),
                   _buildQuickButton(
                     context,

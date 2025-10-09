@@ -1,6 +1,8 @@
+// lib/profile_form_screen.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'main.dart'; // Import RootScreen to redirect back
+import 'package:firebase_database/firebase_database.dart';
+import 'main.dart'; // RootScreen
 
 class ProfileFormScreen extends StatefulWidget {
   final String role; // 'user' or 'companion'
@@ -18,11 +20,20 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
   final TextEditingController _parentNameController = TextEditingController();
   final TextEditingController _parentPhoneController = TextEditingController();
 
+  final db = FirebaseDatabase.instance.ref();
+
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Generate unique ID based on role + phone
+    final userId = widget.role == 'user'
+        ? "user_${_phoneController.text.replaceAll(RegExp(r'\D'), '')}"
+        : "companion_${_phoneController.text.replaceAll(RegExp(r'\D'), '')}";
+
+    // Save locally
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('role', widget.role);
+    await prefs.setString('userId', userId);
     await prefs.setString('name', _nameController.text);
     await prefs.setString('phone', _phoneController.text);
     if (widget.role == 'user') {
@@ -31,9 +42,32 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
       await prefs.setString('parentPhone', _parentPhoneController.text);
     }
 
+    // Prepare data for Firebase
+    Map<String, dynamic> userData = {
+      "role": widget.role,
+      "name": _nameController.text,
+      "phone": _phoneController.text,
+    };
+
+    if (widget.role == 'user') {
+      userData.addAll({
+        "address": _addressController.text,
+        "parentName": _parentNameController.text,
+        "parentPhone": _parentPhoneController.text,
+        "companion": null, // will be linked later
+        "location": null,  // initialized empty
+      });
+    } else {
+      userData["mainUser"] = null; // will be linked after QR scan
+      userData["location"] = null;
+    }
+
+    // Write to Firebase
+    await db.child('users/$userId').set(userData);
+
     if (!mounted) return;
 
-    // ✅ Return to RootScreen instead of pushing multiple routes
+    // Navigate to RootScreen
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const RootScreen()),
@@ -75,49 +109,40 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
                 validator: (v) => v!.isEmpty ? "Enter phone number" : null,
               ),
               const SizedBox(height: 16),
-
-              // User-only fields
-              if (isUser)
-                Column(
-                  children: [
-                    TextFormField(
-                      controller: _addressController,
-                      decoration: const InputDecoration(
-                        labelText: "Address",
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (v) => v!.isEmpty ? "Enter address" : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _parentNameController,
-                      decoration: const InputDecoration(
-                        labelText: "Parent/Guardian Name",
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (v) =>
-                          v!.isEmpty ? "Enter parent name" : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _parentPhoneController,
-                      decoration: const InputDecoration(
-                        labelText: "Parent/Guardian Phone",
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.phone,
-                      validator: (v) =>
-                          v!.isEmpty ? "Enter parent phone" : null,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
+              if (isUser) ...[
+                TextFormField(
+                  controller: _addressController,
+                  decoration: const InputDecoration(
+                    labelText: "Address",
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) => v!.isEmpty ? "Enter address" : null,
                 ),
-
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _parentNameController,
+                  decoration: const InputDecoration(
+                    labelText: "Parent/Guardian Name",
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) => v!.isEmpty ? "Enter parent name" : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _parentPhoneController,
+                  decoration: const InputDecoration(
+                    labelText: "Parent/Guardian Phone",
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.phone,
+                  validator: (v) => v!.isEmpty ? "Enter parent phone" : null,
+                ),
+                const SizedBox(height: 16),
+              ],
               const SizedBox(height: 20),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      isUser ? Colors.pinkAccent : Colors.blueGrey,
+                  backgroundColor: isUser ? Colors.pinkAccent : Colors.blueGrey,
                   minimumSize: const Size(double.infinity, 50),
                 ),
                 onPressed: _saveProfile,
