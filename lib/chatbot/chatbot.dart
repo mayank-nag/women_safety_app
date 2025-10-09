@@ -5,6 +5,9 @@ import 'package:hive/hive.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+
+import 'local_brain.dart'; // optional fallback logic
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -17,8 +20,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final TextEditingController _controller = TextEditingController();
   final List<Map<String, String>> _messages = [];
   late Box _chatMemory;
+  late GenerativeModel _model;
+  late ChatSession _chat;
 
-  Map<String, String> _compressedModel = {}; // small token-response map
+  final LocalBotBrain _fallbackBot = LocalBotBrain();
 
   final Map<String, String> taskLinks = {
     'consumer complaint': 'https://consumerhelpline.gov.in/',
@@ -34,7 +39,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   void initState() {
     super.initState();
     _initMemory();
-    _loadCompressedModel();
+    _initGemini();
   }
 
   Future<void> _initMemory() async {
@@ -49,23 +54,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     await _chatMemory.put('chats', _messages);
   }
 
-  /// Load a small compressed model from JSON file in assets/documents
-  Future<void> _loadCompressedModel() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final modelFile = File('${dir.path}/compressed_model.json');
-
-    if (!await modelFile.exists()) {
-      print("Compressed model file missing at ${modelFile.path}");
-      return;
-    }
-
-    try {
-      final content = await modelFile.readAsString();
-      _compressedModel = Map<String, String>.from(jsonDecode(content));
-      print("Compressed model loaded successfully!");
-    } catch (e) {
-      print("Error loading compressed model: $e");
-    }
+  Future<void> _initGemini() async {
+    const apiKey = "AIzaSyBqyVHPxt08HnP8NB6MQpeoqqC_fdWOnx0"; // 🔑 Replace with your Gemini API key
+    _model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: apiKey);
+    _chat = _model.startChat();
   }
 
   void _sendMessage(String text) {
@@ -80,7 +72,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     userText = userText.trim().toLowerCase();
     String reply = "";
 
-    // Check for task links first
+    // 1️⃣ Check for government task links first
     String? foundLink;
     taskLinks.forEach((keyword, url) {
       if (userText.contains(keyword)) foundLink = url;
@@ -88,36 +80,19 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
     if (foundLink != null) {
       reply = "I found a link that can help you: $foundLink\nTap to open it.";
-    } else if (_compressedModel.isNotEmpty) {
-      // Basic token matching
-      reply = _compressedModel.entries
-          .firstWhere(
-            (entry) => userText.contains(entry.key),
-            orElse: () => const MapEntry("fallback", ""),
-          )
-          .value;
-
-      if (reply.isEmpty) {
-        // fallback responses
-        List<String> fallbackReplies = [
-          "That's interesting! Can you tell me more?",
-          "Hmm, I see. What else?",
-          "Oh! Go on…",
-          "Got it! Anything else you'd like to share?",
-          "I understand. Can you explain a bit more?"
-        ];
-        reply = (fallbackReplies..shuffle()).first;
-      }
     } else {
-      // fallback if model not loaded
-      List<String> fallbackReplies = [
-        "That's interesting! Can you tell me more?",
-        "Hmm, I see. What else?",
-        "Oh! Go on…",
-        "Got it! Anything else you'd like to share?",
-        "I understand. Can you explain a bit more?"
-      ];
-      reply = (fallbackReplies..shuffle()).first;
+      try {
+        // 2️⃣ Use Gemini API for intelligent replies
+        final response = await _chat.sendMessage(Content.text(userText));
+        reply = response.text ?? "";
+
+        // 3️⃣ If Gemini doesn’t respond, use local fallback
+        if (reply.isEmpty) {
+          reply = _fallbackBot.getReply(userText);
+        }
+      } catch (e) {
+        reply = "⚠️ Sorry, I'm having trouble connecting right now.\n${_fallbackBot.getReply(userText)}";
+      }
     }
 
     setState(() => _messages.add({'sender': 'bot', 'text': reply}));
@@ -141,7 +116,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 final msg = _messages[index];
                 final isUser = msg['sender'] == 'user';
                 return Align(
-                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment:
+                      isUser ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 5),
                     padding:
