@@ -7,7 +7,7 @@ import 'emergency.dart';
 import 'sos.dart';
 import 'profile.dart';
 import 'chatbot/chatbot.dart';
-import 'qr_scanner.dart'; // MobileScanner QR scanner
+import 'qr_scanner.dart' as qr;
 
 class HomeScreen extends StatefulWidget {
   final String role; // 'user' or 'companion'
@@ -23,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String address = "";
   String parentName = "";
   String parentPhone = "";
+  String? companionPhone;
 
   @override
   void initState() {
@@ -38,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
       address = prefs.getString('address') ?? "";
       parentName = prefs.getString('parentName') ?? "";
       parentPhone = prefs.getString('parentPhone') ?? "";
+      companionPhone = prefs.getString('companionPhone'); // linked companion
     });
   }
 
@@ -51,24 +53,30 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: true,
         backgroundColor: isUser ? Colors.pinkAccent : Colors.blueGrey,
         actions: [
-          // QR Scanner Icon
+          // QR Scanner button
           IconButton(
             icon: const Icon(Icons.qr_code_scanner),
             onPressed: () {
+              if (phone.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Your phone number not loaded.")),
+                );
+                return;
+              }
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+                MaterialPageRoute(
+                  builder: (_) => qr.QRScannerScreen(currentUserPhone: phone),
+                ),
               );
             },
           ),
-
-          // Settings Icon
+          // Settings
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {},
           ),
-
-          // Profile Icon
+          // Profile
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {
@@ -90,13 +98,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-
       body: SingleChildScrollView(
         child: Column(
           children: [
             const SizedBox(height: 20),
-
-            // SOS Button
             Center(
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -122,9 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 30),
-
             const Text(
               'Quick Access',
               style: TextStyle(
@@ -133,9 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.pinkAccent,
               ),
             ),
-
             const SizedBox(height: 20),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GridView.count(
@@ -159,11 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icons.location_on,
                     "Share Location",
                     () {
-                      // 👇 Build proper Firebase ID from stored phone number
-                      final cleanedPhone =
-                          phone.replaceAll('+', '').replaceAll(' ', '');
-                      final userId = 'user_$cleanedPhone';
-
+                      final userId = 'user_$phone';
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -176,10 +173,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     context,
                     Icons.message,
                     "Messages",
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const MessageScreen()),
-                    ),
+                    () {
+                      // Prototype-safe: use fallback if companion not linked
+                      final chatId = companionPhone ?? "0000000000";
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MessageScreen(companionId: chatId),
+                        ),
+                      );
+                    },
                   ),
                   _buildQuickButton(
                     context,

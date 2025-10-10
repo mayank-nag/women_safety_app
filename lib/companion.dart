@@ -1,15 +1,14 @@
-// lib/companion.dart
+// lib/companion_root.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-
 import 'companion_location.dart';
 import 'companion_chat.dart';
 import 'profile.dart';
 
 class CompanionRoot extends StatefulWidget {
-  final String companionId; // This companion's unique ID (usually phone)
-  final String mainUserId;  // Linked main user ID
+  final String companionId; // Companion's phone or ID
+  final String mainUserId; // Linked main user's phone or ID
 
   const CompanionRoot({
     super.key,
@@ -24,7 +23,7 @@ class CompanionRoot extends StatefulWidget {
 class _CompanionRootState extends State<CompanionRoot> {
   int _selectedIndex = 0;
 
-  // Profile data
+  // Profile info
   String role = 'companion';
   String name = '';
   String phone = '';
@@ -43,7 +42,7 @@ class _CompanionRootState extends State<CompanionRoot> {
     setState(() {
       role = prefs.getString('role') ?? 'companion';
       name = prefs.getString('name') ?? 'Companion';
-      phone = prefs.getString('phone') ?? '0000000000';
+      phone = prefs.getString('phone') ?? '';
       address = prefs.getString('address') ?? '';
       parentName = prefs.getString('parentName') ?? '';
       parentPhone = prefs.getString('parentPhone') ?? '';
@@ -51,28 +50,24 @@ class _CompanionRootState extends State<CompanionRoot> {
   }
 
   void _showQrCode() {
+    if (phone.isEmpty) return;
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => SimpleQrScreen(name: name, phone: phone),
-      ),
+      MaterialPageRoute(builder: (_) => SimpleQrScreen(phone: phone)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final List<Widget> _screens = [
-      // Correct: use userId for CompanionLocationScreen
       CompanionLocationScreen(
         companionId: widget.companionId,
         userId: widget.mainUserId,
       ),
-      // Correct: pass mainUserId as required for CompanionChatScreen
       CompanionChatScreen(
-        companionId: widget.companionId,
         mainUserId: widget.mainUserId,
+        companionId: widget.companionId,
       ),
-      // Profile page
       ProfileScreen(
         role: role,
         name: name,
@@ -90,10 +85,7 @@ class _CompanionRootState extends State<CompanionRoot> {
         backgroundColor: Colors.blue[700],
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code),
-            onPressed: _showQrCode,
-          ),
+          IconButton(icon: const Icon(Icons.qr_code), onPressed: _showQrCode),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -124,17 +116,13 @@ class _CompanionRootState extends State<CompanionRoot> {
   }
 }
 
-// QR Code screen
 class SimpleQrScreen extends StatelessWidget {
-  final String name;
   final String phone;
 
-  const SimpleQrScreen({super.key, required this.name, required this.phone});
+  const SimpleQrScreen({super.key, required this.phone});
 
   @override
   Widget build(BuildContext context) {
-    final qrString = 'Name: $name\nPhone: $phone';
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('QR Code'),
@@ -142,8 +130,8 @@ class SimpleQrScreen extends StatelessWidget {
       ),
       body: Center(
         child: QrImageView(
-          data: qrString,
-          size: 200.0,
+          data: phone,
+          size: 200,
           version: QrVersions.auto,
           gapless: false,
         ),

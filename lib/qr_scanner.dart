@@ -2,72 +2,102 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-class QrScannerScreen extends StatefulWidget {
-  const QrScannerScreen({super.key});
+class QRScannerScreen extends StatefulWidget {
+  final String currentUserPhone;
+
+  const QRScannerScreen({super.key, required this.currentUserPhone});
 
   @override
-  State<QrScannerScreen> createState() => _QrScannerScreenState();
+  State<QRScannerScreen> createState() => _QRScannerScreenState();
 }
 
-class _QrScannerScreenState extends State<QrScannerScreen> {
-  final db = FirebaseDatabase.instance.ref();
-  String? mainUserId;
+class _QRScannerScreenState extends State<QRScannerScreen> {
+  final MobileScannerController _controller = MobileScannerController();
+  final DatabaseReference _db = FirebaseDatabase.instance.ref();
+  bool _scanned = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadMainUserId();
-  }
+  void _handleQRCode(String code) async {
+    if (_scanned) return;
+    setState(() => _scanned = true);
 
-  Future<void> _loadMainUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      mainUserId = prefs.getString('userId');
-    });
-  }
+    // Prototype: always link to this companion
+    const companionPhone = '7297017927';
 
-  void _onDetect(BarcodeCapture capture) async {
-    final barcode = capture.barcodes.first;
-    final companionId = barcode.rawValue;
-    if (companionId == null || mainUserId == null) return;
+    try {
+      // Update backend
+      await _db.child('users/${widget.currentUserPhone}').update({
+        'linkedCompanion': companionPhone,
+      });
+      await _db.child('users/$companionPhone').update({
+        'linkedUser': widget.currentUserPhone,
+      });
 
-    // Check if companion exists
-    final snapshot = await db.child('users/$companionId').get();
-    if (!snapshot.exists) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Companion not found in database!")),
-      );
-      return;
+      // Success dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text("Success!"),
+            content: const Text("User and Companion linked successfully."),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pop(context);
+                },
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error linking: $e")),
+        );
+      }
     }
 
-    // Link mainUser -> companion
-    await db.child('users/$mainUserId/companion').set(companionId);
+    await Future.delayed(const Duration(seconds: 1));
+    if (mounted) setState(() => _scanned = false);
+  }
 
-    // Link companion -> mainUser
-    await db.child('users/$companionId/mainUser').set(mainUserId);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Companion linked successfully!")),
-    );
-
-    // Close scanner
-    Navigator.pop(context);
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (mainUserId == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
-      appBar: AppBar(title: const Text("Scan Companion QR")),
-      body: MobileScanner(
-        onDetect: _onDetect,
+      appBar: AppBar(title: const Text("QR Scanner")),
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller: _controller,
+            onDetect: (capture) {
+              for (final barcode in capture.barcodes) {
+                final String? code = barcode.rawValue;
+                if (code != null) _handleQRCode(code); // pretend this is companion QR
+              }
+            },
+          ),
+          if (_scanned)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                color: Colors.black54,
+                child: const Text(
+                  'Scanning...',
+                  style: TextStyle(color: Colors.white, fontSize: 18),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
