@@ -190,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     "Chatbot",
                     () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const ChatbotScreen()),
+                      MaterialPageRoute(builder: (_) => const Chatbot()),
                     ),
                   ),
                 ],
