@@ -17,41 +17,53 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
   bool _scanned = false;
 
-  void _handleQRCode(String code) async {
+  /// Handles scanned QR codes (links user ↔ companion dynamically)
+  Future<void> _handleQRCode(String code) async {
     if (_scanned) return;
     setState(() => _scanned = true);
 
-    // Prototype: always link to this companion
-    const companionPhone = '7297017927';
+    final companionId = code.trim(); // Expected format: "companion_<phone>"
+    final currentUserId = "user_${widget.currentUserPhone.replaceAll(RegExp(r'\\D'), '')}";
+
+    if (!companionId.startsWith("companion_")) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid QR code. Please scan a valid Companion QR.")),
+      );
+      setState(() => _scanned = false);
+      return;
+    }
 
     try {
-      // Update backend
-      await _db.child('users/${widget.currentUserPhone}').update({
-        'linkedCompanion': companionPhone,
-      });
-      await _db.child('users/$companionPhone').update({
-        'linkedUser': widget.currentUserPhone,
+      // 🔹 Link both user and companion in Realtime DB
+      await _db.child('users/$currentUserId').update({
+        'linkedCompanion': companionId,
       });
 
-      // Success dialog
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text("Success!"),
-            content: const Text("User and Companion linked successfully."),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pop(context);
-                },
-                child: const Text("OK"),
-              ),
-            ],
+      await _db.child('users/$companionId').update({
+        'linkedUser': currentUserId,
+      });
+
+      if (!mounted) return;
+
+      // ✅ Show success dialog
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("Link Successful!"),
+          content: Text(
+            "You are now linked with $companionId.\nYou can now chat and share your live location.",
           ),
-        );
-      }
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // close dialog
+                Navigator.pop(context); // return to previous screen
+              },
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -60,6 +72,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       }
     }
 
+    // reset scanned flag after short delay to avoid multiple triggers
     await Future.delayed(const Duration(seconds: 1));
     if (mounted) setState(() => _scanned = false);
   }
@@ -73,7 +86,11 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("QR Scanner")),
+      appBar: AppBar(
+        title: const Text("QR Scanner"),
+        backgroundColor: Colors.pinkAccent,
+        centerTitle: true,
+      ),
       body: Stack(
         children: [
           MobileScanner(
@@ -81,7 +98,10 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
             onDetect: (capture) {
               for (final barcode in capture.barcodes) {
                 final String? code = barcode.rawValue;
-                if (code != null) _handleQRCode(code); // pretend this is companion QR
+                if (code != null && code.isNotEmpty) {
+                  _handleQRCode(code);
+                  break;
+                }
               }
             },
           ),
@@ -91,8 +111,10 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 color: Colors.black54,
+                width: double.infinity,
                 child: const Text(
                   'Scanning...',
+                  textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white, fontSize: 18),
                 ),
               ),

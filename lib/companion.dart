@@ -50,7 +50,12 @@ class _CompanionRootState extends State<CompanionRoot> {
   }
 
   void _showQrCode() {
-    if (phone.isEmpty) return;
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Phone number not found!")),
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => SimpleQrScreen(phone: phone)),
@@ -123,17 +128,34 @@ class SimpleQrScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // generate a Firebase-consistent ID
+    final companionId = "companion_${phone.replaceAll(RegExp(r'\\D'), '')}";
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('QR Code'),
         backgroundColor: Colors.blue[700],
       ),
       body: Center(
-        child: QrImageView(
-          data: phone,
-          size: 200,
-          version: QrVersions.auto,
-          gapless: false,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            QrImageView(
+              data: companionId, // ✅ the new correct ID format
+              size: 220,
+              version: QrVersions.auto,
+              gapless: false,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              "Scan to link Companion:\n$companionId",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.blue[700],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );
