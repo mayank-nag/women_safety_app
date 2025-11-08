@@ -51,6 +51,8 @@ class _ChatbotState extends State<Chatbot> {
 - National Commission for Women: 011-26942369 / 26944754
 - Police Emergency: 112
 """,
+    "new button" : """
+working """,
   };
 
   // Additional static response dataset

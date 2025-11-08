@@ -25,28 +25,32 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Generate unique ID based on role + phone
-    final userId = widget.role == 'user'
-        ? "user_${_phoneController.text.replaceAll(RegExp(r'\D'), '')}"
-        : "companion_${_phoneController.text.replaceAll(RegExp(r'\D'), '')}";
+    // 🧹 sanitize the number (remove spaces, +, etc.)
+    final cleanedPhone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
 
-    // Save locally
+    // generate consistent Firebase ID
+    final userId = widget.role == 'user'
+        ? "user_$cleanedPhone"
+        : "companion_$cleanedPhone";
+
+    // 🧠 save all data locally (both phone and formatted ID)
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('role', widget.role);
     await prefs.setString('userId', userId);
     await prefs.setString('name', _nameController.text);
-    await prefs.setString('phone', _phoneController.text);
+    await prefs.setString('phone', cleanedPhone); // ✅ store only cleaned digits
+
     if (widget.role == 'user') {
       await prefs.setString('address', _addressController.text);
       await prefs.setString('parentName', _parentNameController.text);
       await prefs.setString('parentPhone', _parentPhoneController.text);
     }
 
-    // Prepare data for Firebase
-    Map<String, dynamic> userData = {
+    // 🧾 prepare Firebase data
+    final Map<String, dynamic> userData = {
       "role": widget.role,
       "name": _nameController.text,
-      "phone": _phoneController.text,
+      "phone": cleanedPhone, // ✅ cleaned
     };
 
     if (widget.role == 'user') {
@@ -54,20 +58,20 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
         "address": _addressController.text,
         "parentName": _parentNameController.text,
         "parentPhone": _parentPhoneController.text,
-        "companion": null, // will be linked later
-        "location": null,  // initialized empty
+        "linkedCompanion": null,
+        "location": null,
       });
     } else {
-      userData["mainUser"] = null; // will be linked after QR scan
+      userData["linkedUser"] = null;
       userData["location"] = null;
     }
 
-    // Write to Firebase
+    // 🗄️ write to Firebase with consistent path
     await db.child('users/$userId').set(userData);
 
     if (!mounted) return;
 
-    // Navigate to RootScreen
+    // ✅ navigate to root screen
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const RootScreen()),
@@ -142,7 +146,8 @@ class _ProfileFormScreenState extends State<ProfileFormScreen> {
               const SizedBox(height: 20),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isUser ? Colors.pinkAccent : Colors.blueGrey,
+                  backgroundColor:
+                      isUser ? Colors.pinkAccent : Colors.blueGrey,
                   minimumSize: const Size(double.infinity, 50),
                 ),
                 onPressed: _saveProfile,

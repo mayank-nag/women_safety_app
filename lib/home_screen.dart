@@ -1,6 +1,7 @@
 // lib/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'location.dart';
 import 'message.dart';
 import 'emergency.dart';
@@ -39,8 +40,49 @@ class _HomeScreenState extends State<HomeScreen> {
       address = prefs.getString('address') ?? "";
       parentName = prefs.getString('parentName') ?? "";
       parentPhone = prefs.getString('parentPhone') ?? "";
-      companionPhone = prefs.getString('companionPhone'); // linked companion
+      companionPhone = prefs.getString('companionPhone');
     });
+  }
+
+  /// ✅ New method to open chat dynamically with linked companion
+  Future<void> _openChat() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId') ?? "";
+
+    if (userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("User ID missing — please restart app")),
+      );
+      return;
+    }
+
+    try {
+      final db = FirebaseDatabase.instance.ref();
+      final snapshot =
+          await db.child("users/$userId/linkedCompanion").get();
+
+      if (!snapshot.exists || snapshot.value == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("No companion linked yet!")),
+        );
+        return;
+      }
+
+      final companionId = snapshot.value.toString();
+      print("DEBUG → launching chat with $companionId");
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MessageScreen(companionId: companionId),
+        ),
+      );
+    } catch (e) {
+      print("ERROR (home_screen) → $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to open chat. Try again.")),
+      );
+    }
   }
 
   @override
@@ -53,7 +95,6 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: true,
         backgroundColor: isUser ? Colors.pinkAccent : Colors.blueGrey,
         actions: [
-          // QR Scanner button
           IconButton(
             icon: const Icon(Icons.qr_code_scanner),
             onPressed: () {
@@ -66,17 +107,16 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => qr.QRScannerScreen(currentUserPhone: phone),
+                  builder: (_) =>
+                      qr.QRScannerScreen(currentUserPhone: phone),
                 ),
               );
             },
           ),
-          // Settings
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {},
           ),
-          // Profile
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {
@@ -173,16 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     context,
                     Icons.message,
                     "Messages",
-                    () {
-                      // Prototype-safe: use fallback if companion not linked
-                      final chatId = companionPhone ?? "0000000000";
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => MessageScreen(companionId: chatId),
-                        ),
-                      );
-                    },
+                    _openChat, // ✅ updated
                   ),
                   _buildQuickButton(
                     context,

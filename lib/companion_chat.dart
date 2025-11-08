@@ -4,8 +4,8 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CompanionChatScreen extends StatefulWidget {
-  final String mainUserId;      // ID of the main user
-  final String companionId;     // ID of the companion
+  final String mainUserId; // e.g., "user_11111"
+  final String companionId; // e.g., "companion_33333"
 
   const CompanionChatScreen({
     super.key,
@@ -18,10 +18,10 @@ class CompanionChatScreen extends StatefulWidget {
 }
 
 class _CompanionChatScreenState extends State<CompanionChatScreen> {
+  final TextEditingController _msgController = TextEditingController();
   late DatabaseReference _chatRef;
-  List<Map<String, dynamic>> messages = [];
-  final TextEditingController _controller = TextEditingController();
   String _userId = "";
+  List<Map<String, dynamic>> _messages = [];
 
   @override
   void initState() {
@@ -29,90 +29,99 @@ class _CompanionChatScreenState extends State<CompanionChatScreen> {
     _initialize();
   }
 
+  /// Initialize chat by loading companion ID and setting up Firebase path
   Future<void> _initialize() async {
     final prefs = await SharedPreferences.getInstance();
-    final storedPhone = prefs.getString('phone') ?? "";
+    _userId = prefs.getString('userId') ?? "";
 
-    _userId = storedPhone.isNotEmpty ? storedPhone : "unknown_user";
+    // 🧠 debug output for diagnostics
+    print("DEBUG (companion chat) → loaded userId: $_userId");
+    print("DEBUG (companion chat) → mainUserId: ${widget.mainUserId}");
+    print("DEBUG (companion chat) → companionId: ${widget.companionId}");
 
-    // Sort IDs so chat path is unique and consistent
+    if (_userId.isEmpty || widget.mainUserId.isEmpty) {
+      print("ERROR → Missing IDs, cannot initialize chat.");
+      return;
+    }
+
+    // build a consistent chat path
     final sortedIds = [widget.mainUserId, widget.companionId]..sort();
     final chatId = "${sortedIds[0]}_${sortedIds[1]}";
+    _chatRef = FirebaseDatabase.instance.ref("chats/$chatId/messages");
 
-    _chatRef = FirebaseDatabase.instance.ref().child('chats/$chatId/messages');
+    print("DEBUG (companion chat) → chat path: chats/$chatId/messages");
 
-    // Listen to database changes
+    _listenForMessages();
+  }
+
+  /// listen for messages in realtime
+  void _listenForMessages() {
     _chatRef.onValue.listen((event) {
-      final data = event.snapshot.value;
-      if (data == null || data is! Map) {
-        setState(() => messages = []);
-        return;
-      }
+      final data = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
+      final temp = data.entries.map((e) {
+        final val = Map<String, dynamic>.from(e.value);
+        return val;
+      }).toList();
 
-      final temp = <Map<String, dynamic>>[];
-      data.forEach((key, value) {
-        temp.add({
-          'id': key,
-          'senderId': value['senderId'] ?? '',
-          'text': value['text'] ?? '',
-          'timestamp': value['timestamp'] ?? '',
-        });
-      });
+      temp.sort((a, b) => a['timestamp'].compareTo(b['timestamp']));
+      setState(() => _messages = temp);
 
-      temp.sort((a, b) {
-        try {
-          return DateTime.parse(a['timestamp'])
-              .compareTo(DateTime.parse(b['timestamp']));
-        } catch (_) {
-          return 0;
-        }
-      });
-
-      setState(() => messages = temp);
+      print("DEBUG (companion chat) → ${_messages.length} messages loaded");
     });
   }
 
-  void _sendMessage() {
-    if (_controller.text.trim().isEmpty) return;
+  /// send a new message
+  Future<void> _sendMessage() async {
+    final text = _msgController.text.trim();
+    if (text.isEmpty) return;
+    _msgController.clear();
 
-    _chatRef.push().set({
-      'senderId': _userId,
-      'text': _controller.text.trim(),
-      'timestamp': DateTime.now().toIso8601String(),
-    });
+    print("DEBUG (companion chat) → sending from: $_userId");
+    print("DEBUG (companion chat) → path: ${_chatRef.path}");
+    print("DEBUG (companion chat) → text: $text");
 
-    _controller.clear();
+    final msgData = {
+      "sender": _userId,
+      "text": text,
+      "timestamp": ServerValue.timestamp,
+    };
+
+    try {
+      await _chatRef.push().set(msgData);
+      print("DEBUG (companion chat) → message pushed successfully ✅");
+    } catch (e) {
+      print("ERROR (companion chat) → $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Companion Chat"),
-        backgroundColor: Colors.blueGrey,
-      ),
+      appBar: AppBar(title: const Text("Chat with User")),
       body: Column(
         children: [
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(8),
-              itemCount: messages.length,
+              itemCount: _messages.length,
               itemBuilder: (context, index) {
-                final msg = messages[index];
-                final isMe = msg['senderId'] == _userId;
+                final msg = _messages[index];
+                final isMe = msg["sender"] == _userId;
+
                 return Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment:
+                      isMe ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.all(12),
+                    margin:
+                        const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: isMe ? Colors.blueGrey : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(12),
+                      color: isMe ? Colors.blue[700] : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      msg['text'],
+                      msg["text"],
                       style: TextStyle(
-                        color: isMe ? Colors.white : Colors.black87,
+                        color: isMe ? Colors.white : Colors.black,
                       ),
                     ),
                   ),
@@ -120,13 +129,13 @@ class _CompanionChatScreenState extends State<CompanionChatScreen> {
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
+          Container(
+            padding: const EdgeInsets.all(8),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
-                    controller: _controller,
+                    controller: _msgController,
                     decoration: const InputDecoration(
                       hintText: "Type a message...",
                       border: OutlineInputBorder(),
@@ -134,9 +143,8 @@ class _CompanionChatScreenState extends State<CompanionChatScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.send),
+                  icon: const Icon(Icons.send, color: Colors.blue),
                   onPressed: _sendMessage,
-                  color: Colors.blueGrey,
                 ),
               ],
             ),

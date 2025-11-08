@@ -1,14 +1,15 @@
 // lib/companion_root.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'companion_location.dart';
 import 'companion_chat.dart';
 import 'profile.dart';
 
 class CompanionRoot extends StatefulWidget {
-  final String companionId; // Companion's phone or ID
-  final String mainUserId; // Linked main user's phone or ID
+  final String companionId; // e.g., companion_33333
+  final String mainUserId; // optional (used after linking)
 
   const CompanionRoot({
     super.key,
@@ -31,10 +32,15 @@ class _CompanionRootState extends State<CompanionRoot> {
   String parentName = '';
   String parentPhone = '';
 
+  // Chat linkage
+  String? linkedUserId;
+  bool _isLoadingChat = false;
+
   @override
   void initState() {
     super.initState();
     _loadProfileData();
+    _fetchLinkedUser();
   }
 
   Future<void> _loadProfileData() async {
@@ -47,6 +53,41 @@ class _CompanionRootState extends State<CompanionRoot> {
       parentName = prefs.getString('parentName') ?? '';
       parentPhone = prefs.getString('parentPhone') ?? '';
     });
+  }
+
+  /// ✅ fetch linked user dynamically from Firebase
+  Future<void> _fetchLinkedUser() async {
+    setState(() => _isLoadingChat = true);
+
+    final prefs = await SharedPreferences.getInstance();
+    final companionId = prefs.getString('userId') ?? "";
+
+    if (companionId.isEmpty) {
+      print("ERROR → companion ID missing in SharedPreferences");
+      setState(() => _isLoadingChat = false);
+      return;
+    }
+
+    try {
+      final db = FirebaseDatabase.instance.ref();
+      final snapshot = await db.child("users/$companionId/linkedUser").get();
+
+      if (!snapshot.exists || snapshot.value == null) {
+        print("DEBUG → no linked user yet for $companionId");
+        setState(() {
+          linkedUserId = null;
+          _isLoadingChat = false;
+        });
+        return;
+      }
+
+      linkedUserId = snapshot.value.toString();
+      print("DEBUG → companion linked with user: $linkedUserId");
+    } catch (e) {
+      print("ERROR (companion_root) → $e");
+    } finally {
+      setState(() => _isLoadingChat = false);
+    }
   }
 
   void _showQrCode() {
@@ -67,12 +108,30 @@ class _CompanionRootState extends State<CompanionRoot> {
     final List<Widget> _screens = [
       CompanionLocationScreen(
         companionId: widget.companionId,
-        userId: widget.mainUserId,
+        userId: linkedUserId ?? widget.mainUserId,
       ),
-      CompanionChatScreen(
-        mainUserId: widget.mainUserId,
-        companionId: widget.companionId,
-      ),
+
+      // ✅ Chat tab — shows loading or chat screen directly
+      _isLoadingChat
+          ? const Center(child: CircularProgressIndicator())
+          : linkedUserId == null
+              ? const Center(
+                  child: Text(
+                    "No linked user yet.\nAsk the user to scan your QR code.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.blueGrey,
+                    ),
+                  ),
+                )
+              : CompanionChatScreen(
+                  mainUserId: linkedUserId!,
+                  companionId: widget.companionId,
+                ),
+
+      // Profile tab
       ProfileScreen(
         role: role,
         name: name,
@@ -95,7 +154,14 @@ class _CompanionRootState extends State<CompanionRoot> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
+        onTap: (index) async {
+          setState(() => _selectedIndex = index);
+
+          // 🔄 Refresh linked user when switching to chat tab
+          if (index == 1) {
+            await _fetchLinkedUser();
+          }
+        },
         selectedItemColor: Colors.blue[700],
         unselectedItemColor: Colors.blueGrey,
         showUnselectedLabels: true,
@@ -128,8 +194,8 @@ class SimpleQrScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // generate a Firebase-consistent ID
-    final companionId = "companion_${phone.replaceAll(RegExp(r'\\D'), '')}";
+    // ✅ generate correct Firebase ID
+    final companionId = "companion_${phone.replaceAll(RegExp(r'\D'), '')}";
 
     return Scaffold(
       appBar: AppBar(
@@ -141,7 +207,7 @@ class SimpleQrScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             QrImageView(
-              data: companionId, // ✅ the new correct ID format
+              data: companionId,
               size: 220,
               version: QrVersions.auto,
               gapless: false,
